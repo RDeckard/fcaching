@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Gabriel"]
   spec.email         = ["rdeckard.gt@gmail.com"]
 
-  spec.summary       = %q{Easy caching (using files) Ruby objects.}
+  spec.summary       = %q{Easy caching (in memory + files persistency) for Ruby objects.}
   spec.homepage      = "https://github.com/RDeckard/fcaching"
   spec.license       = "MIT"
 

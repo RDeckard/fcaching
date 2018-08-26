@@ -1,6 +1,6 @@
 # FCaching
 
-Easy caching (using files) for Ruby objects.
+Easy caching (in memory + files persistency) for Ruby objects.
 
 ## Installation
 
@@ -83,14 +83,14 @@ FCaching.get("key1")
 ```ruby
 FCaching.get("key4")
 # => nil
-FCaching.set("key1", "something")
+FCaching.set("key4", "something")
 # => true
-FCaching.get("key1")
+FCaching.get("key4")
 # => "something"
 sleep 2
-FCaching.get("key1", max_age: 1)
+FCaching.get("key4", max_age: 1)
 # => nil
-FCaching.get("key1", max_age: 3)
+FCaching.get("key4", max_age: 3)
 # => "something"
 ```
 
