@@ -1,5 +1,6 @@
-require "bundler/setup"
-require "fcaching"
+require 'bundler/setup'
+
+require 'fcaching'
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -10,5 +11,9 @@ RSpec.configure do |config|
 
   config.expect_with :rspec do |c|
     c.syntax = :expect
+  end
+
+  config.after(:suite) do
+    FileCaching.clear_cache!
   end
 end

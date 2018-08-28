@@ -1,25 +1,26 @@
 require 'time'
+require 'fileutils'
+
+require_relative 'gen_caching'
 require_relative 'refinements'
 
 module FileCaching
   using Refinements
 
+  extend GenCaching
   extend self
 
   STORE_DIR = '.fcaching_store'
-  Dir.mkdir(STORE_DIR) unless Dir.exist?(STORE_DIR)
 
-  def fetch(key, max_age: nil, force: false, return_object: true)
-    if block_given? and (force or not cached?(key, max_age: max_age))
-      set(key, yield, return_object: return_object)
-    else
-      get(key, max_age: max_age)
-    end
+  def self.extended(mod)
+    mod.extend GenCaching
   end
 
   def set(key, object, return_object: false)
     filesystem_guard(key)
+    nil_value_guard(object)
     del(key)
+    Dir.mkdir(STORE_DIR) unless Dir.exist?(STORE_DIR)
     File.write("#{STORE_DIR}/#{key}_#{Time.now.iso8601}", Marshal.dump(object))
     return_object ? object : true
   end
@@ -40,8 +41,8 @@ module FileCaching
       then { |filepaths| File.delete(*filepaths) }
   end
 
-  def cached?(key, max_age: nil)
-    !existing_filenames(key, max_age: max_age).empty?
+  def clear_cache!
+    FileUtils.rm_rf(STORE_DIR) if Dir.exist?(STORE_DIR)
   end
 
   def filesystem_guard(string)
@@ -55,6 +56,7 @@ module FileCaching
   private
 
   def existing_filenames(key, max_age: nil)
+    Dir.mkdir(STORE_DIR) unless Dir.exist?(STORE_DIR)
     Dir.children(STORE_DIR).
       select do |filename|
         file_data = parse(filename)
