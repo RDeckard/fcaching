@@ -16,82 +16,90 @@ And then execute:
 
 ## Usage
 
-### `FCaching.fetch` - the Swiss Army knife of caching
+### `FCaching#fetch` - the Swiss Army knife of caching
 
 Basic usage - store and fetch:
 
 ```ruby
-FCaching.fetch("key1")
+cache = FCaching.new
+
+cache.fetch("key")
 # => nil
 # Nothing is stored yet for this key
-FCaching.fetch("key1") { "value" }
+cache.fetch("key") { "value" }
 # => "value" # The block is evaluated, its result is cached and returned
-FCaching.fetch("key1")
+cache.fetch("key")
 # => "value" # The cached value is returned (even after restarting the script or application)
 ```
 
 Fetch and update basic policy:
 
 ```ruby
+cache = FCaching.new
+
 # Store a new key/value
-FCaching.fetch("key2") { {a: 1, b: 2} }
+cache.fetch("key") { {a: 1, b: 2} }
 # => {:a=>1, :b=>2}
-FCaching.fetch("key2") { {a: 2, b: 4} }
+cache.fetch("key") { {a: 2, b: 4} }
 # => {:a=>1, :b=>2} # The block is not evaluated because of the existance of the cached value
-FCaching.fetch("key2", force: true) { {a: 2, b: 4} }
+cache.fetch("key", force: true) { {a: 2, b: 4} }
 # => {:a=>2, :b=>4} # The cache is updated by force with the returned value of the block
 ```
 
 Fetch and update policy based on time:
 
 ```ruby
- # Store a new key/value
-FCaching.fetch("key3") { {a: 1, "b" => :value} }
+cache = FCaching.new
+
+# Store a new key/value
+cache.fetch("key") { {a: 1, "b" => :value} }
 # => {:a=>1, "b"=>:value}
 
 sleep 2
 
-FCaching.fetch("key3", max_age: 1)
+cache.fetch("key", max_age: 1)
 # => nil # The cache is not fetched because of its age
 ruby_object = Object.new
 # => #<Object:0x000056111cfb3d98>
-FCaching.fetch("key3", max_age: 3) { ruby_object }
+cache.fetch("key", max_age: 3) { ruby_object }
 # => {:a=>1, "b"=>:value} # The cached value is young enough so it is fetched, and the block is not evaluated
 
 sleep 2
 
-FCaching.fetch("key3", max_age: 3) { ruby_object }
+cache.fetch("key", max_age: 3) { ruby_object }
 # => #<Object:0x000056111cfb3d98> # The cache is updated by the block because of its outdated age (sorry dude)
 ```
 
 ### Other "Low level" methods
 
-`FCaching.set` and `FCaching.get` and `FCaching.delete`:
+`FCaching#set` and `FCaching#get` and `FCaching#delete`:
 
 ```ruby
-FCaching.get("key4")
+cache = FCaching.new
+
+cache.get("key")
 # => nil
-FCaching.set("key4", "nothing is")
+cache.set("key", "nothing")
 # => true
-FCaching.get("key4")
-# => "nothing is"
-FCaching.set("key4", "something")
+cache.get("key")
+# => "nothing"
+cache.set("key", "something")
 # => true
-FCaching.get("key4")
+cache.get("key")
 # => "something"
 
 sleep 2
 
-FCaching.get("key4", max_age: 1)
+cache.get("key", max_age: 1)
 # => nil
-FCaching.get("key4", max_age: 3)
+cache.get("key", max_age: 3)
 # => "something"
 
-FCaching.del("key5")
+cache.del("new_key")
 # => 0
-FCaching.del("key4")
+cache.del("key")
 # => 1
-FCaching.del("key4")
+cache.del("key")
 # => 0
 ```
 

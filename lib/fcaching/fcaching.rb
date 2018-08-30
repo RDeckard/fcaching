@@ -1,25 +1,26 @@
 require_relative 'mem_caching'
 require_relative 'file_caching'
 
-module FCaching
-  extend self
+class FCaching
 
-  @default_persistency = true
+  attr_accessor :default_persistency, :memcache, :filecache
 
-  class << self
-    attr_accessor :default_persistency
+  def initialize(store_dir: nil, default_persistency: true)
+    @default_persistency = default_persistency
+    @memcache  = MemCaching.new
+    @filecache = FileCaching.new(store_dir || FileCaching::DEFAULT_STORE_DIR)
   end
 
   def fetch(key, max_age: nil, force: false, return_object: true, persistency: default_persistency)
     if block_given?
       if force
         set(key, yield, return_object: return_object, persistency: persistency)
-      elsif (retrieved_mem_value = MemCaching.get(key, max_age: max_age)).nil?
-        if !persistency or (retrieved_file_value = FileCaching.get(key, max_age: max_age)).nil?
+      elsif (retrieved_mem_value = memcache.get(key, max_age: max_age)).nil?
+        if !persistency or (retrieved_file_value = filecache.get(key, max_age: max_age)).nil?
           set(key, yield, return_object: return_object, persistency: persistency)
         else
-          persistency && FileCaching.filesystem_guard(key)
-          MemCaching.set(key,
+          persistency && filecache.filesystem_guard(key)
+          memcache.set(key,
               retrieved_file_value,
               return_object: true
             )
@@ -33,18 +34,18 @@ module FCaching
   end
 
   def set(key, object, return_object: false, persistency: default_persistency)
-    persistency && FileCaching.filesystem_guard(key)
-    MemCaching.set(key, object) &&
-      persistency && FileCaching.set(key, object)
+    persistency && filecache.filesystem_guard(key)
+    memcache.set(key, object) &&
+      persistency && filecache.set(key, object)
     return_object ? object : true
   end
 
   def get(key, max_age: nil, persistency: default_persistency)
-    if (retrieved_mem_value = MemCaching.get(key, max_age: max_age)).nil?
+    if (retrieved_mem_value = memcache.get(key, max_age: max_age)).nil?
       if persistency
-        FileCaching.filesystem_guard(key)
-        unless (retrieved_file_value = FileCaching.get(key, max_age: max_age)).nil?
-          MemCaching.set(key,
+        filecache.filesystem_guard(key)
+        unless (retrieved_file_value = filecache.get(key, max_age: max_age)).nil?
+          memcache.set(key,
               retrieved_file_value,
               return_object: true
             )
@@ -56,8 +57,8 @@ module FCaching
   end
 
   def del(key, persistency: default_persistency)
-    persistency && FileCaching.filesystem_guard(key)
-    if (res = MemCaching.del(key) + (persistency ? FileCaching.del(key) : 0)) % (persistency ? 2 : 1) == 0
+    persistency && filecache.filesystem_guard(key)
+    if (res = memcache.del(key) + (persistency ? filecache.del(key) : 0)) % (persistency ? 2 : 1) == 0
       res / (persistency ? 2 : 1)
     else
       (res / (persistency ? 2.0 : 1.0)).round(1)
@@ -65,7 +66,7 @@ module FCaching
   end
 
   def clear_cache!
-    MemCaching.clear_cache!
-    FileCaching.clear_cache!
+    memcache.clear_cache!
+    filecache.clear_cache!
   end
 end

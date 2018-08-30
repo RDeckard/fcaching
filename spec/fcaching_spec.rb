@@ -1,20 +1,19 @@
-module ExtendedMemModule
-  extend MemCaching
-end
+SLEEP_TIMESTEP=0.1
 
-module ExtendedFileModule
-  extend FileCaching
-end
+[MemCaching, FileCaching, FCaching].each do |klass|
+  RSpec.describe "#{klass} instance" do
+    before(:example) do
+      @cache = klass.new
+      @cache.del('key')
+    end
 
-[MemCaching, ExtendedMemModule, FileCaching, ExtendedFileModule, FCaching].each do |mod|
-  RSpec.describe mod do
-    before(:each) do
-      mod.del('key')
+    after(:example) do
+      @cache.clear_cache!
+      @cache = nil
     end
 
     contexts =
-      case mod
-      when FCaching
+      if klass == FCaching
         {
           true => 'default persistency set on `true`',
           false => 'default persistency set on `false`'
@@ -27,107 +26,130 @@ end
 
     contexts.each do |context, description|
       context description do
-        mod.default_persistency = context unless context.nil?
         describe %i[set get].join(',') do
           it "should do basic caching actions" do
-            first_value = 'nothing is'
+            @cache.default_persistency = context unless context.nil?
 
-            expect(mod.get('key')).
+            first_value = 'nothing'
+
+            expect(@cache.get('key')).
               to eq nil
 
-            expect(mod.set('key', first_value)).
+            expect(@cache.set('key', first_value)).
               to eq true
 
-            expect(mod.get('key')).
+            expect(@cache.get('key')).
               to eq first_value
 
             new_value = 'something'
 
-            expect(mod.set('key', new_value)).
+            expect(@cache.set('key', new_value)).
               to eq true
 
-            expect(mod.get('key')).
+            expect(@cache.get('key')).
               to eq new_value
           end
 
           it "should handle time policies" do
-            tested_value = 'something'
-            mod.set('key', tested_value)
+            @cache.default_persistency = context unless context.nil?
 
-            sleep 2
-
-            expect(mod.get('key', max_age: 1)).
+            expect(@cache.get('key')).
               to eq nil
 
-            expect(mod.get('key', max_age: 3)).
+            tested_value = 'something'
+
+            @cache.set('key', tested_value)
+
+            sleep(2 * SLEEP_TIMESTEP)
+
+            expect(@cache.get('key', max_age: SLEEP_TIMESTEP)).
+              to eq nil
+
+            expect(@cache.get('key', max_age: (3 * SLEEP_TIMESTEP))).
               to eq tested_value
           end
         end
 
         describe :del do
           it "should delete cached value and return the number of deleted values" do
-            mod.del('new_key')
-            mod.set('key', 'something')
+            @cache.default_persistency = context unless context.nil?
 
-            expect(mod.del('new_key')).
+            expect(@cache.get('key')).
+              to eq nil
+
+            @cache.set('key', 'something')
+
+            expect(@cache.del('new_key')).
               to eq 0
 
-            expect(mod.del('key')).
+            expect(@cache.del('key')).
               to eq 1
 
-            expect(mod.del('key')).
+            expect(@cache.del('key')).
               to eq 0
           end
         end
 
         describe :fetch do
           it "should store and fetch values" do
-            expect(mod.fetch('key')).
+            @cache.default_persistency = context unless context.nil?
+
+            expect(@cache.fetch('key')).
               to eq nil
 
             value = 'value'
 
-            expect(mod.fetch('key') { value }).
+            expect(@cache.fetch('key') { value }).
               to eq value
 
-            expect(mod.fetch('key')).
+            expect(@cache.fetch('key')).
               to eq value
           end
 
           it "should can update value by force" do
+            @cache.default_persistency = context unless context.nil?
+
+            expect(@cache.get('key')).
+              to eq nil
+
             first_value = {a: 1, b: 2}
 
-            expect(mod.fetch('key') { first_value }).
+            expect(@cache.fetch('key') { first_value }).
               to eq first_value
 
             new_value = {a: 2, b: 4}
 
-            expect(mod.fetch('key') { new_value }).
+            expect(@cache.fetch('key') { new_value }).
               to eq first_value
 
-            expect(mod.fetch('key', force: true) { new_value }).
+            expect(@cache.fetch('key', force: true) { new_value }).
               to eq new_value
           end
 
           it "should can update value based on time policies" do
+            @cache.default_persistency = context unless context.nil?
+
+            expect(@cache.get('key')).
+              to eq nil
+
             first_value = {a: 1, b: 2}
 
-            expect(mod.fetch('key') { first_value }).
+            expect(@cache.fetch('key') { first_value }).
               to eq first_value
 
-            sleep 2
+            sleep(2 * SLEEP_TIMESTEP)
 
-            expect(mod.fetch('key', max_age: 1)).
+            expect(@cache.fetch('key', max_age: SLEEP_TIMESTEP)).
               to eq nil
 
             ruby_object = Object.new
 
-            expect(mod.fetch('key', max_age: 3) { ruby_object }).
+            expect(@cache.fetch('key', max_age: (3 * SLEEP_TIMESTEP)) { ruby_object }).
               to eq first_value
 
-            sleep 2
+            sleep(2 * SLEEP_TIMESTEP)
 
-            expect(mod.fetch('key', max_age: 3) { ruby_object }).
+            expect(@cache.fetch('key', max_age: (3 * SLEEP_TIMESTEP)) { ruby_object }).
               to eq ruby_object
           end
         end
@@ -137,48 +159,55 @@ end
 end
 
 RSpec.describe FCaching do
+    before(:context) do
+      @cache = FCaching.new(default_persistency: true)
+      @cache.del('key')
+      @value = 'value'
+    end
+
+    after(:context) do
+      @cache.clear_cache!
+      @cache = nil
+    end
   it "has a version number" do
     expect(FCaching::VERSION).not_to be nil
   end
 
   context 'default persistency set on `true`' do
-    FCaching.default_persistency = true
-
-    it "should use 'file caching' when 'mem caching' can't retrieve cached value" do
-      value = 'value'
-      FCaching.del('key')
-      FCaching.fetch('key') { value }
-
-      expect(FCaching.fetch('key')).
-        to eq value
-      expect(FCaching.get('key')).
-        to eq value
-
-      expect(MemCaching.fetch('key')).
-        to eq value
-      expect(MemCaching.get('key')).
-        to eq value
-
-      MemCaching.clear_cache!
-
-      expect(MemCaching.fetch('key')).
-        to eq nil
-      expect(MemCaching.get('key')).
+    it "should use 'file caching' when 'mem caching' can't retrieve a cached value" do
+      expect(@cache.get('key')).
         to eq nil
 
-      expect(FCaching.fetch('key')).
-        to eq value
-      expect(FCaching.get('key')).
-        to eq value
+      @cache.set('key', @value)
+
+      expect(@cache.fetch('key')).
+        to eq @value
+      expect(@cache.get('key')).
+        to eq @value
+
+      expect(@cache.memcache.fetch('key')).
+        to eq @value
+      expect(@cache.memcache.get('key')).
+        to eq @value
+
+      @cache.memcache.clear_cache!
+
+      expect(@cache.memcache.fetch('key')).
+        to eq nil
+      expect(@cache.memcache.get('key')).
+        to eq nil
+
+      expect(@cache.fetch('key')).
+        to eq @value
+      expect(@cache.get('key')).
+        to eq @value
     end
 
-    it "should have update 'mem caching' with this 'file cached' value" do
-      value = 'value'
-
-      expect(MemCaching.fetch('key')).
-        to eq value
-      expect(MemCaching.get('key')).
-        to eq value
+    it "should then have updated 'mem caching' with the 'file cached' value" do
+      expect(@cache.memcache.fetch('key')).
+        to eq @value
+      expect(@cache.memcache.get('key')).
+        to eq @value
     end
   end
 end

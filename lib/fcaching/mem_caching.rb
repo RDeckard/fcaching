@@ -1,17 +1,13 @@
 require_relative 'gen_caching'
 require_relative 'refinements'
 
-module MemCaching
+class MemCaching
   using Refinements
 
-  extend GenCaching
-  extend self
+  include GenCaching
 
-  @mem_store = Hash.new { {} }
-
-  def self.extended(mod)
-    mod.extend GenCaching
-    mod.instance_variable_set(:@mem_store, Hash.new { {} })
+  def initialize
+    @mem_store = Hash.new { {} }
   end
 
   def set(key, object, return_object: false)
